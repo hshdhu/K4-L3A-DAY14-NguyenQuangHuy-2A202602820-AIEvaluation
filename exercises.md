@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness | Điểm overlap thấp vì diễn đạt tương đương hoặc từ chối hợp lệ, sau khi đối chiếu xác nhận không có claim sai. | Bịa quyền lợi, phí, trạng thái đơn hoặc khẳng định đã hoàn tiền khi không có quyền thao tác. | Đối chiếu từng claim với evidence; sửa claim không có nguồn, dùng rubric để kiểm tra trường hợp lệch do cách diễn đạt. |
+| Answer Relevance | Câu hỏi ngoài phạm vi hoặc có tiền đề sai; câu trả lời đúng cần bác yêu cầu thay vì lặp lại từ trong câu hỏi. | Bỏ qua ý chính của yêu cầu hợp lệ, chẳng hạn hỏi hủy đơn nhưng chỉ nói về bảo hành. | Kiểm tra intent và các ý cần trả lời; phân biệt từ chối đúng với lạc đề, bổ sung ví dụ trong prompt nếu cần. |
+| Context Recall | Expected answer có nhiều từ diễn giải nhưng retrieved chunks vẫn chứa đủ điều khoản quyết định; cần kiểm tra ngữ nghĩa trước khi chấp nhận. | Thiếu ngày hiệu lực, ngoại lệ hoặc điều kiện membership làm thay đổi kết luận đổi trả. | So sánh gold evidence với từng chunk; thử cải thiện query, chunking hoặc truy xuất nhiều bước, đo lại coverage. |
+| Context Precision | Có thêm chunks nhiễu nhưng evidence cần thiết vẫn đủ và answer đã được xác nhận đúng; có thể theo dõi thay vì chặn ngay. | Noise che khuất điều khoản đúng hoặc đưa phiên bản không áp dụng lên trước, dẫn tới kết luận sai. | Review thứ tự chunks, thử reranking và lọc theo metadata trong experiment; kiểm tra Recall không giảm. |
+| Completeness | Câu trả lời ngắn bỏ phần phụ không được hỏi hoặc dùng từ khác nhưng vẫn đáp ứng đủ yêu cầu thực tế. | Bỏ điều kiện làm thay đổi quyết định, như miễn restocking nhưng vẫn phải trừ giá trị quà giữ lại. | Tách câu hỏi thành các ý cần đáp ứng; kiểm tra đủ điều kiện/ngoại lệ, không tăng độ dài chỉ để tăng overlap. |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -46,15 +46,15 @@ Ba bias thường gặp:
 
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
-> *Câu trả lời:*
+> Với mỗi câu hỏi, chọn hai đáp án A và B đã được người chấm đánh giá độc lập. Condition 1 trình bày A trước B; condition 2 trình bày B trước A. Giữ nguyên question, evidence, rubric, model và cấu hình judge, ẩn nguồn đáp án và dùng phiên chấm độc lập cho từng lần. Đảo ngẫu nhiên thứ tự chạy hai conditions và lặp lại trên nhiều cặp thuộc cả bốn độ khó. Sau đó quy điểm về đúng danh tính A/B, so sánh điểm của cùng đáp án khi đứng đầu và đứng sau, cùng tỷ lệ đổi lựa chọn sau khi đảo vị trí. Nếu cùng đáp án thường được điểm cao hơn khi đứng đầu thì có dấu hiệu position bias; cần xem độ biến động giữa các lần chạy và đối chiếu human labels trước khi kết luận. Đây là thiết kế thí nghiệm, chưa phải kết quả đã chạy.
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
-> *Câu trả lời:*
+> Chấm theo các ý bắt buộc, tính đúng và evidence, không theo số từ hoặc số đoạn. Với OrbitTech, một câu trả lời ngắn vẫn được điểm tối đa nếu nêu đúng chính sách, điều kiện và bước tiếp theo cần thiết. Nội dung lặp lại không được cộng điểm; claim thêm không có nguồn bị trừ Correctness dù văn phong tốt. Dùng cặp đáp án ngắn/dài chứa cùng claims để kiểm tra rubric có vô tình thưởng độ dài không. Không áp dụng giới hạn độ dài cứng khiến các câu nhiều điều kiện bị thiếu ý.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
-> *Câu trả lời:*
+> Judge có thể chấm ổn định nhưng vẫn hiểu sai quy định hoặc ưu tiên văn phong. Nhãn của người chấm dựa trên corpus giúp xác định judge có nhận ra đúng phiên bản chính sách, ngoại lệ và từ chối hợp lệ hay không. Chọn mẫu có đủ độ khó và edge cases, để hai người chấm độc lập rồi thống nhất các bất đồng; so sánh điểm từng tiêu chí và các lỗi nghiêm trọng với judge. Điều chỉnh rubric trên mẫu hiệu chỉnh, kiểm tra lại trên mẫu giữ riêng và khóa rubric trước benchmark. Human labels cũng có sai lệch nên cần lý do và evidence, không chỉ một con số. A01/A02 trong lần chạy này minh họa nhu cầu review nhãn tự động, nhưng chưa phải thí nghiệm hiệu chỉnh LLM judge.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
@@ -62,13 +62,15 @@ Ba bias thường gặp:
 
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | Giảm trung bình > 0.05 so với baseline | Phát hiện mức suy giảm grounding đáng chú ý; bất kỳ claim chính sách sai nghiêm trọng hoặc tiết lộ dữ liệu đã được xác nhận cũng phải chặn riêng. |
+| Answer Relevance | Giảm trung bình > 0.05 so với baseline | Phát hiện thay đổi làm answer ít đáp ứng câu hỏi hơn; review nhóm adversarial để không nhầm từ chối đúng với lạc đề. |
+| Completeness | Giảm trung bình > 0.05 so với baseline | Phát hiện bỏ sót thông tin sau thay đổi; vẫn chặn riêng khi thiếu điều kiện quyết định quyền lợi dù trung bình chưa giảm tới ngưỡng. |
+
+Đây là ngưỡng regression theo `run_regression()`, không phải mức điểm tuyệt đối để xác nhận hệ thống an toàn. Giảm đúng 0.05 không bị chặn. Quy tắc pass từng case trong lab vẫn là cả ba answer metrics >= 0.5; các khoảng 0.6/0.8 dùng diễn giải chất lượng. Baseline hiện tại chỉ phục vụ so sánh, chưa được coi là chuẩn production: lỗi mâu thuẫn H01 cần xử lý trước triển khai. Unit tests, validator, tính đầy đủ của artifacts và review safety/policy đều phải đạt. Khi dữ liệu thiếu thì dừng kiểm tra, không coi là pass; khi điểm sát ngưỡng thì chạy lặp lại và review biến động.
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
-> *Câu trả lời:*
+> Offline evaluation dùng trước merge/release hoặc sau thay đổi prompt, model, retrieval và corpus: chạy bộ QA cố định, kiểm tra unit tests, schema, benchmark và regression để so với baseline. Online evaluation dùng sau triển khai có kiểm soát để theo dõi câu hỏi thực tế, tỷ lệ chuyển hỗ trợ, phản hồi người dùng, độ trễ và lỗi mới; dữ liệu phải được loại bỏ thông tin nhạy cảm trước khi đưa vào phân tích. Human review dùng khi các metrics bất đồng, điểm sát ngưỡng, câu hỏi có ngoại lệ chính sách hoặc liên quan privacy/safety, cũng như để kiểm tra các câu từ chối bị heuristic gán lỗi. Cases mới được xác nhận sẽ bổ sung cho vòng benchmark tiếp theo; không tự thay dataset hiện tại trong lúc so sánh regression.
 
 ---
 
